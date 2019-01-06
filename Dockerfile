@@ -1,5 +1,5 @@
 # A minimal Nginx container including ContainerPilot
-FROM nginx:1.13
+FROM nginx:1.14
 
 # Add some stuff via apt-get
 RUN apt-get update \
@@ -12,8 +12,8 @@ RUN apt-get update \
 
 # Install Consul
 # Releases at https://releases.hashicorp.com/consul
-RUN export CONSUL_VERSION=0.7.5 \
-    && export CONSUL_CHECKSUM=40ce7175535551882ecdff21fdd276cef6eaab96be8a8260e0599fadb6f1f5b8 \
+RUN export CONSUL_VERSION=1.4.0 \
+    && export CONSUL_CHECKSUM=41f8c3d63a18ef4e51372522c1e052618cdfcffa3d9f02dba0b50820e8279824\
     && curl --retry 7 --fail -vo /tmp/consul.zip "https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip" \
     && echo "${CONSUL_CHECKSUM}  /tmp/consul.zip" | sha256sum -c \
     && unzip /tmp/consul -d /usr/local/bin \
@@ -34,10 +34,10 @@ RUN export CONSUL_TEMPLATE_VERSION=0.18.3 \
     && rm /tmp/consul-template.zip
 
 # Add Containerpilot and set its configuration
-ENV CONTAINERPILOT_VER 3.0.0
+ENV CONTAINERPILOT_VER 3.8.0
 ENV CONTAINERPILOT /etc/containerpilot.json5
 
-RUN export CONTAINERPILOT_CHECKSUM=6da4a4ab3dd92d8fd009cdb81a4d4002a90c8b7c \
+RUN export CONTAINERPILOT_CHECKSUM=84642c13683ddae6ccb63386e6160e8cb2439c26 \
     && curl -Lso /tmp/containerpilot.tar.gz \
          "https://github.com/joyent/containerpilot/releases/download/${CONTAINERPILOT_VER}/containerpilot-${CONTAINERPILOT_VER}.tar.gz" \
     && echo "${CONTAINERPILOT_CHECKSUM}  /tmp/containerpilot.tar.gz" | sha1sum -c \
@@ -45,11 +45,11 @@ RUN export CONTAINERPILOT_CHECKSUM=6da4a4ab3dd92d8fd009cdb81a4d4002a90c8b7c \
     && rm /tmp/containerpilot.tar.gz
 
 # Add Dehydrated
-RUN export DEHYDRATED_VERSION=v0.3.1 \
+RUN export DEHYDRATED_VERSION=v0.6.2 \
     && curl --retry 8 --fail -Lso /tmp/dehydrated.tar.gz "https://github.com/lukas2511/dehydrated/archive/${DEHYDRATED_VERSION}.tar.gz" \
     && tar xzf /tmp/dehydrated.tar.gz -C /tmp \
-    && mv /tmp/dehydrated-0.3.1/dehydrated /usr/local/bin \
-    && rm -rf /tmp/dehydrated-0.3.1
+    && mv /tmp/dehydrated-0.6.2/dehydrated /usr/local/bin \
+    && rm -rf /tmp/dehydrated-0.6.2
 
 # Add jq
 RUN export JQ_VERSION=1.5 \
@@ -61,6 +61,7 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 COPY etc/acme /etc/acme
 COPY etc/containerpilot.json5 /etc/
 COPY etc/nginx /etc/nginx/templates
+COPY etc/consul /etc/consul
 COPY bin /usr/local/bin
 
 # Usable SSL certs written here

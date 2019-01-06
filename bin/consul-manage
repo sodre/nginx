@@ -1,0 +1,75 @@
+#!/bin/bash
+set -eo pipefail
+
+#
+# Update the -advertise address based on the interface that ContainerPilot has
+# been told to listen on.
+#
+preStart() {
+
+    if [ -n "$CONSUL_DATACENTER_NAME" ]; then
+        _log "Updating consul datacenter name (specified: '${CONSUL_DATACENTER_NAME}' )"
+        sed -i "s/CONSUL_DATACENTER_NAME/${CONSUL_DATACENTER_NAME}/" /etc/consul/consul.hcl
+    elif [ -f "/native/usr/sbin/mdata-get" ]; then
+        DETECTED_DATACENTER_NAME=$(/native/usr/sbin/mdata-get sdc:datacenter_name)
+        _log "Updating consul datacenter name (detected: '${DETECTED_DATACENTER_NAME}')"
+        sed -i "s/CONSUL_DATACENTER_NAME/${DETECTED_DATACENTER_NAME}/" /etc/consul/consul.hcl
+    else
+        _log "Updating consul datacenter name (default: 'dc1')"
+        sed -i "s/CONSUL_DATACENTER_NAME/dc1/" /etc/consul/consul.hcl
+    fi
+
+}
+
+_log() {
+    echo "    $(date -u '+%Y-%m-%d %H:%M:%S') containerpilot: $@"
+}
+
+
+#
+# Defines $1 in the consul configuration as either an env or a default.
+# This basically behaves like ${!name_of_var} and ${var:-default} together
+# but separates the  indirect reference from the default so it's more obvious
+#
+# Check if $2 is the name of a defined environment variable and use ${!2} to
+# reference it indirectly.
+#
+# If it is not defined, use $3 as the value
+#
+updateConfigFromEnvOrDefault() {
+    _log "Updating consul field $1"
+    sed -i "/^$1/d" /etc/consul/consul.hcl
+
+    if [ -n "${!2}" ]; then
+        echo "$1 = \"${!2}\"" >> /etc/consul/consul.hcl
+    else
+        echo "$1 = \"$3\"" >> /etc/consul/consul.hcl
+    fi
+}
+
+# ---------------------------------------------------
+# parse arguments
+
+# Get function list
+funcs=($(declare -F -p | cut -d " " -f 3))
+
+until
+    if [ ! -z "$1" ]; then
+        # check if the first arg is a function in this file, or use a default
+        if [[ " ${funcs[@]} " =~ " $1 " ]]; then
+            cmd=$1
+            shift 1
+        fi
+
+        $cmd "$@"
+        if [ $? == 127 ]; then
+            help
+        fi
+
+        exit
+    else
+        health
+    fi
+do
+    echo
+done

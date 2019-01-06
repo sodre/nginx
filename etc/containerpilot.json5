@@ -3,7 +3,11 @@
   jobs: [
     {
       name: "preStart",
-      exec: "generate-config"
+      exec: "generate-config",
+      when: {
+        source: "consul-agent",
+        once: "healthy"
+      },
     },
     {
       name: "nginx",
@@ -24,6 +28,10 @@
       name: "nginx-public",
       port: 80,
       interfaces: ["eth1", "eth0"],
+      when: {
+        source: "nginx",
+        once: "healthy"
+      },
       health: {
         exec: "health-check http",
         interval: 10,
@@ -31,11 +39,41 @@
       }
     },
     {{ if .ACME_DOMAIN }}{
+      name: "acme-init",
+      when: {
+        source: "nginx",
+        once: "healthy"
+      },
+      exec: "acme init",
+      restarts: "unlimited"
+    },
+    {
+      name: "acme-watch",
+      exec: ["acme", "watch"],
+      when: {
+        source: "acme-init",
+        once: "exitSuccess"
+      },
+      restarts: "unlimited"
+    },
+    {
+      name: "acme-checkin",
+      exec: [ "acme", "checkin" ],
+      timeout: "10s",
+      when: {
+        interval: "1h",
+      }
+    },
+    {
       name: "nginx-ssl",
       port: 443,
       interfaces: ["eth0"],
+      when: {
+        source: "acme-init",
+        once: "exitSuccess"
+      },
       health: {
-        exec: "acme init && health-check https",
+        exec: "health-check https",
         interval: 10,
         ttl: 25
       }
@@ -43,24 +81,27 @@
     {
       name: "nginx-public-ssl",
       port: 443,
-      interfaces: ["eth0"],
+      interfaces: ["eth0", "eth1"],
+      when: {
+        source: "nginx-ssl",
+        once: "healthy"
+      },
       health: {
         exec: "health-check https",
         interval: 10,
         ttl: 25,
       }
+    },{{ end }}
+
+    //
+    // The Consul Agent
+    {{ if .CONSUL_AGENT }}{
+      name: "consul-prestart",
+      exec: [
+        "consul-manage", "preStart"
+      ]
     },
     {
-      name: "nginx-public-ssl",
-      port: 443,
-      interfaces: ["eth1", "eth0"],
-      health: {
-        exec: "/usr/bin/curl --insecure --fail --silent --show-error --output /dev/null --header \"HOST: {{ .ACME_DOMAIN }}\" https://localhost/nginx-health",
-        interval: 10,
-        ttl: 25
-      }
-    },{{ end }}
-    {{ if .CONSUL_AGENT }}{
       name: "consul-agent",
       exec: [
         "consul", "agent",
@@ -71,20 +112,12 @@
         "-retry-max", "10",
         "-retry-interval", "10s"
       ],
+      health: {
+        exec: "curl -so /dev/null http://localhost:8500",
+        interval: 10,
+        ttl: 25
+      },
       restarts: "unlimited"
-    },{{ end }}
-    {{ if .ACME_DOMAIN }}{
-      name: "acme-watch",
-      exec: ["acme", "watch"],
-      restarts: "unlimited"
-    },
-    {
-      name: "acme-checkin",
-      exec: [ "acme", "checkin" ],
-      timeout: "10s",
-      when: {
-        interval: "1h",
-      }
     },{{ end }}
     {
       // this sensor runs -putmetric to each of the metrics described

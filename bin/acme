@@ -127,15 +127,18 @@ case "$1" in
         acquireLeader
         ;;
     watch)
-        /usr/local/bin/consul-template -config /etc/acme/watch.hcl -consul $CONSUL_HOST:8500
+        /usr/local/bin/consul-template -config /etc/acme/watch.hcl -consul-addr $CONSUL_HOST:8500
         ;;
     init)
         if [ -f ${CERT_DIR}/fullchain.pem -a -f ${CERT_DIR}/privkey.pem ]; then
             exit 0
         fi
         shift
+
+
         renewConsulSession &&
         acquireLeader &&
+        ${SCRIPTPATH}/dehydrated --register --accept-terms --config /etc/acme/dehydrated/config.${ACME_ENV} &&
         ${SCRIPTPATH}/dehydrated --cron --domain ${ACME_DOMAIN} --hook /etc/acme/dehydrated/hook.sh --config /etc/acme/dehydrated/config.${ACME_ENV}
         ;;
     renew-certs)
@@ -157,7 +160,10 @@ case "$1" in
         updateKeys
         ;;
     checkin)
-        renewConsulSession &&
+        if ! [ -f ${CERT_DIR}/fullchain.pem -a -f ${CERT_DIR}/privkey.pem ]; then
+            exit 0
+        fi
+         renewConsulSession &&
         ( acquireLeader || exit 0 ) &&
         ${SCRIPTPATH}/dehydrated --cron --domain ${ACME_DOMAIN} --hook /etc/acme/dehydrated/hook.sh --config /etc/acme/dehydrated/config.${ACME_ENV} &&
         ${SCRIPTPATH}/dehydrated --cleanup --domain ${ACME_DOMAIN} --hook /etc/acme/dehydrated/hook.sh --config /etc/acme/dehydrated/config.${ACME_ENV}
