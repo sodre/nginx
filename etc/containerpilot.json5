@@ -1,6 +1,8 @@
 {
   consul: "{{ if .CONSUL_AGENT }}localhost{{ else }}{{ if .CONSUL }}{{ .CONSUL }}{{ else }}consul{{ end }}{{ end }}:8500",
   jobs: [
+    //
+    // NGINX itself
     {
       name: "preStart",
       exec: "generate-config",
@@ -38,6 +40,9 @@
         ttl: 25,
       }
     },
+
+    //
+    // The ACME work
     {{ if .ACME_DOMAIN }}{
       name: "acme-init",
       when: {
@@ -127,7 +132,25 @@
       when: {
         interval: "5s"
       }
+    },
+    {{ if .BACKEND }}
+    //
+    // The BACKEND watcher, if we have one
+    {
+      name: "onChange",
+      exec: "reload",
+      when: {
+        source: "watch.{{ .BACKEND }}",
+        each: "changed"
+      }
     }
+  ],
+  watches: [
+    {
+      name: "{{ .BACKEND }}",
+      interval: 7
+    }
+  {{ end }}
   ],
   telemetry: {
     port: 9090,
