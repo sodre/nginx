@@ -64,6 +64,8 @@ COPY etc/nginx /etc/nginx/templates
 COPY etc/consul /etc/consul
 COPY bin /usr/local/bin
 
+# TCP/UDP configuration goes here
+RUN mkdir -p /etc/nginx/stream.d
 # Usable SSL certs written here
 RUN mkdir -p /var/www/ssl
 # Temporary/work space for keys
